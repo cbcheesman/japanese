@@ -38,6 +38,20 @@ router.get('/', function (req, res, next) {
 
 
 
+//create full hirigana cards
+var fullhiraganadeck;
+glob("./public/hiragana/*", function (er, files) {
+  fullhiraganadeck = files;
+  fullhiraganadeck.forEach((card, index, array) => array[index] = card.replace(`/public`, ``));
+})
+
+//create hirigana cards
+var hiraganadeck;
+glob("./public/hiragana/*", function (er, files) {
+  hiraganadeck = files;
+  hiraganadeck.forEach((card, index, array) => array[index] = card.replace(`/public`, ``));
+})
+
 //create darkdeck
 var darkdeck;
 glob("./public/dark/*", function (er, files) {
@@ -60,6 +74,8 @@ var tempplayerdata = [];
 var discard = [];
 var pile = [];
 var darkpile = [];
+var hiraganapile = [];
+var fullhiraganapile = [];
 var temppile = [];
 var temphand = [];
 var turn = 0;
@@ -260,38 +276,10 @@ io.on('connection', function (socket) {
   //user picks up a card
   socket.on('pickupanddraw', function (uuid) {
     message(`${uuidToName(uuid)} picked up from the deck`);
-    if (drawEnabled) {
-      message(`${uuidToName(uuid)} - had to pick up ${drawAmount} cards`);
-      playerIndex = uuidToIndex(uuid);
-      turn = playerIndex;
-      for (let drawIndex = 0; drawIndex < drawAmount; drawIndex++) {
-        players[playerIndex].hand.push(pile.pop());
-        checkPile();
-      }
-      drawAmount = 0;
-      drawEnabled = false;
-      challengeEnabled = false;
-      darkdraw = false;
-	  darkdrawcolour = '';
-      playedCard = '';
-      reverseCard = false;
-	  slapdownCard = false;
-      skip = false;
-      skipAll = false;
-      turnCounter++;
-      playerdata[turn].uno = false;
-      playerdata[turn].unotime = null;
-      dontWaitUp = null;
-      dontWaitUpCard = '';
-	  killmessage = '';
-	  endmessage = '';
-      nextTurn(false);
-      playerdata[playerIndex].cardsInHand = players[playerIndex].hand.length;
-      updateState();
-    } else {
+    
       message(`${uuidToName(uuid)} picked up a card`);
       if (players[turn].uuid == uuid) {
-        let pickupCard = pile.pop();
+        let pickupCard = hiraganapile.pop();
         players[turn].hand.push(pickupCard);
         //check if the player can put it down straight away
         dontWaitUp = uuid;
@@ -316,16 +304,23 @@ io.on('connection', function (socket) {
         message(`${uuidToName(uuid)} played out of turn`);
       }
       updateState();
-    }
+    
   });
 
-
+//WHENA PILE IS CLICKED
   //user picks up a card - This is the original single button command
   socket.on('pickup', function (uuid) {
     message(`${uuidToName(uuid)} picked up a card`);
     if (players[turn].uuid == uuid) {
       let pickupCard = pile.pop();
-      players[turn].hand.push(pickupCard);
+ //     players[turn].hand.push(pickupCard);
+	  
+	   discard.push(pickupCard);
+  //remove from hand
+ // players[playerIndex].hand = players[playerIndex].hand.filter((item) => { return item !== card });
+  
+ // checkPile();
+	  
       //check if the player can put it down straight away
       dontWaitUp = uuid;
       dontWaitUpCard = pickupCard;
@@ -451,101 +446,101 @@ io.on('connection', function (socket) {
   });
 
   //user plays challenge
-  socket.on('challenge', function (uuid) {
-    previousPlayerIndex = nextPlayer(turn, !reverseDirection);
-    message(`${uuidToName(uuid)} challenged ${players[previousPlayerIndex].name}`);
-
-    let invalid = false;
-    //check if that colour could have been played
-    players[previousPlayerIndex].hand.forEach(card => {
-      invalid = invalid || card.includes(prevCurrentColour);
-    });
-
-    if (invalid) {
-      //play was invalid
-      message(`challenge succeeded`);
-      if (discard.slice(-1).pop().includes('wild_pick')) {
-        players[previousPlayerIndex].hand.push(pile.pop());
-        checkPile();
-        players[previousPlayerIndex].hand.push(pile.pop());
-        checkPile();
-		message(`${playerdata[previousPlayerIndex].name} - had to pick up 2 cards`);
-	  }	else if (discard.slice(-1).pop().includes('wild_dark_pick')) {
-		for(let cardIndex = 0; cardIndex < drawAmount; cardIndex++)
-		{
-			players[previousPlayerIndex].hand.push(pile.pop());
-			checkPile();
-        }
-		message(`${playerdata[previousPlayerIndex].name} - had to pick up ${drawAmount} cards`);
-      } else {
-		  players[previousPlayerIndex].hand.push(pile.pop());
-		  checkPile();
-		  players[previousPlayerIndex].hand.push(pile.pop());
-		  checkPile();	
-		  message(`${playerdata[previousPlayerIndex].name} - had to pick up 2 cards`);	  
-	  }
-	  playerdata[previousPlayerIndex].uno = false;
-      playerdata[previousPlayerIndex].unotime = null;
-
-      //this player now chooses the colour
-	  if(playedCard.includes('wild_dark')) {
-		socket.emit('rechoosedarkColour');
-	  } else {
-		socket.emit('rechooseColour');
-	  }
+//  socket.on('challenge', function (uuid) {
+//   previousPlayerIndex = nextPlayer(turn, !reverseDirection);
+//    message(`${uuidToName(uuid)} challenged ${players[previousPlayerIndex].name}`);
+//
+//    let invalid = false;
+//    //check if that colour could have been played
+//    players[previousPlayerIndex].hand.forEach(card => {
+//     invalid = invalid || card.includes(prevCurrentColour);
+//    });
+//
+//    if (invalid) {
+//      //play was invalid
+//      message(`challenge succeeded`);
+//      if (discard.slice(-1).pop().includes('wild_pick')) {
+//        players[previousPlayerIndex].hand.push(pile.pop());
+//        checkPile();
+//        players[previousPlayerIndex].hand.push(pile.pop());
+//        checkPile();
+//		message(`${playerdata[previousPlayerIndex].name} - had to pick up 2 cards`);
+//	  }	else if (discard.slice(-1).pop().includes('wild_dark_pick')) {
+//		for(let cardIndex = 0; cardIndex < drawAmount; cardIndex++)
+//		{
+//			players[previousPlayerIndex].hand.push(pile.pop());
+//			checkPile();
+//        }
+//		message(`${playerdata[previousPlayerIndex].name} - had to pick up ${drawAmount} cards`);
+//      } else {
+//		  players[previousPlayerIndex].hand.push(pile.pop());
+//		  checkPile();
+//		  players[previousPlayerIndex].hand.push(pile.pop());
+//		  checkPile();	
+//		  message(`${playerdata[previousPlayerIndex].name} - had to pick up 2 cards`);	  
+//	  }
+//	  playerdata[previousPlayerIndex].uno = false;
+//      playerdata[previousPlayerIndex].unotime = null;
+//
+//      //this player now chooses the colour
+//	  if(playedCard.includes('wild_dark')) {
+//		socket.emit('rechoosedarkColour');
+//	  } else {
+//		socket.emit('rechooseColour');
+//	  }
+//	  
+//    } else {
+//      message(`challenge failed`);
+//      if (discard.slice(-1).pop().includes('wild_dark_pick')) {
+//        for(let cardIndex = 0; cardIndex < drawAmount; cardIndex++)
+//		{
+//			players[turn].hand.push(pile.pop());
+//			checkPile();
+ //       }
+  //      players[turn].hand.push(pile.pop());
+   //     checkPile();
+    //    players[turn].hand.push(pile.pop());
+    //    checkPile();
+	//	message(`${playerdata[turn].name} - had to pick up ${(drawAmount + 2)} cards`);
+//      }
+ //     else if (discard.slice(-1).pop().includes('wild_pick')) {
+   //     players[turn].hand.push(pile.pop());
+     //   checkPile();
+    //    players[turn].hand.push(pile.pop());
+     //   checkPile();
+//        players[turn].hand.push(pile.pop());
+ //       checkPile();
+ //       players[turn].hand.push(pile.pop());
+   //     checkPile();
+//		message(`${playerdata[turn].name} - had to pick up 4 cards`);
+//	  } else {
+//		  players[turn].hand.push(pile.pop());
+//		  checkPile();
+//		  players[turn].hand.push(pile.pop());
+//		  checkPile();
+//		  message(`${playerdata[turn].name} - had to pick up 2 cards`);
+ //     }
+  //    playerdata[turn].uno = false;
+   //   playerdata[turn].unotime = null;
 	  
-    } else {
-      message(`challenge failed`);
-      if (discard.slice(-1).pop().includes('wild_dark_pick')) {
-        for(let cardIndex = 0; cardIndex < drawAmount; cardIndex++)
-		{
-			players[turn].hand.push(pile.pop());
-			checkPile();
-        }
-        players[turn].hand.push(pile.pop());
-        checkPile();
-        players[turn].hand.push(pile.pop());
-        checkPile();
-		message(`${playerdata[turn].name} - had to pick up ${(drawAmount + 2)} cards`);
-      }
-      else if (discard.slice(-1).pop().includes('wild_pick')) {
-        players[turn].hand.push(pile.pop());
-        checkPile();
-        players[turn].hand.push(pile.pop());
-        checkPile();
-        players[turn].hand.push(pile.pop());
-        checkPile();
-        players[turn].hand.push(pile.pop());
-        checkPile();
-		message(`${playerdata[turn].name} - had to pick up 4 cards`);
-	  } else {
-		  players[turn].hand.push(pile.pop());
-		  checkPile();
-		  players[turn].hand.push(pile.pop());
-		  checkPile();
-		  message(`${playerdata[turn].name} - had to pick up 2 cards`);
-      }
-      playerdata[turn].uno = false;
-      playerdata[turn].unotime = null;
-	  
 
-    }
-    challengeEnabled = false;
-    darkdraw = false;
-	darkdrawcolour = '';
-    drawAmount = 0;
-	playedCard = '';
-    drawEnabled = false;
-    dontWaitUp = null;
-    dontWaitUpCard = '';
-    playerdata[turn].cardsInHand = players[turn].hand.length;
-    playerdata[previousPlayerIndex].cardsInHand = players[previousPlayerIndex].hand.length;
-    if ((!invalid) && (discard.slice(-1).pop().includes('wild_pick'))) {
+   // }
+ //   challengeEnabled = false;
+  //  darkdraw = false;
+//	darkdrawcolour = '';
+ //   drawAmount = 0;
+//	playedCard = '';
+ //   drawEnabled = false;
+  //  dontWaitUp = null;
+ //   dontWaitUpCard = '';
+  //  playerdata[turn].cardsInHand = players[turn].hand.length;
+  //  playerdata[previousPlayerIndex].cardsInHand = players[previousPlayerIndex].hand.length;
+  //  if ((!invalid) && (discard.slice(-1).pop().includes('wild_pick'))) {
       //The challenge failed, this person needs to pick up more but they don't get a turn if it's a Draw 4.
-      nextTurn(false);
-    }
-    updateState();
-  });
+  //    nextTurn(false);
+  //  }
+ //   updateState();
+ // });
 
   //user plays pick two - This is the original single button command
   socket.on('drawCard', function (uuid) {
@@ -696,27 +691,33 @@ function deal() {
   pile = [...deck]
   //get the darkdeck from the darkpile
   darkpile = [...darkdeck]
+  //get the hiraganadeck from the hiraganapile
+  hiraganapile = [...hiraganadeck]
+  //get the fullhiraganadeck from the fullhiraganapile
+  fullhiraganapile = [...fullhiraganadeck]
   //randomly sort
   pile.sort(() => Math.random() - 0.5);
+  hiraganapile.sort(() => Math.random() - 0.5);
+  fullhiraganapile.sort(() => Math.random() - 0.5);
   //deal
   
   turn = dealer;
   players.forEach((player, playerIndex) => {
-    for (let cardIndex = 0; cardIndex < 7; cardIndex++) {
-      players[playerIndex].hand.push(pile.pop());
+    for (let cardIndex = 0; cardIndex < 0; cardIndex++) {
+      players[playerIndex].hand.push(hiraganapile.pop());
     }
     players[playerIndex].hand.sort();
     playerdata[playerIndex].cardsInHand = players[playerIndex].hand.length;
   });
   //one for the top of the discard
 
-  discard.push(pile.pop());
+  discard.push(hiraganapile.pop());
   let topCard = discard.slice(-1).pop()
-  if (!topCard.includes('wild')) {
-    currentColour = cardColour(topCard);
-  } else {
-    // Choose colour
-  }
+ // if (!topCard.includes('wild')) {
+ //   currentColour = cardColour(topCard);
+ // } else {
+ //   // Choose colour
+ // }
 
   //draw one
   if (topCard.includes('picker')) {
@@ -725,44 +726,44 @@ function deal() {
   }
 
   //draw four
-  if (topCard.includes('wild_pick')) {
-	let unluckyplayer = nextPlayer(turn, reverseDirection);
-	unlucky = true;
-    message(`${playerdata[unluckyplayer].name} got dealt a Draw 2! Unlucky! They'll choose the colour.`);
-	for (let cardIndex = 0; cardIndex < 2; cardIndex++) {
-		  players[unluckyplayer].hand.push(pile.pop());
-		}
-		players[unluckyplayer].hand.sort();
-		playerdata[unluckyplayer].cardsInHand = players[unluckyplayer].hand.length;
-	 }
+  //if (topCard.includes('wild_pick')) {
+//	let unluckyplayer = nextPlayer(turn, reverseDirection);
+//	unlucky = true;
+//   message(`${playerdata[unluckyplayer].name} got dealt a Draw 2! Unlucky! They'll choose the colour.`);
+//	for (let cardIndex = 0; cardIndex < 2; cardIndex++) {
+//		  players[unluckyplayer].hand.push(pile.pop());
+//		}
+//		players[unluckyplayer].hand.sort();
+//		playerdata[unluckyplayer].cardsInHand = players[unluckyplayer].hand.length;
+//	 }
 
   //skip
-  skip = false;
-  skipAll = false;
-  if (topCard.includes('skip')) {
-    skip = true;
-    skippedPlayer = nextPlayer(turn, reverseDirection);
-    message(`${playerdata[skippedPlayer].name} got skipped (1st Card)`);
-  }
+//  skip = false;
+//  skipAll = false;
+//  if (topCard.includes('skip')) {
+//    skip = true;
+//   skippedPlayer = nextPlayer(turn, reverseDirection);
+//    message(`${playerdata[skippedPlayer].name} got skipped (1st Card)`);
+//  }
 
   //reverse
-  reverseCard = false;
-  endmessage = '';
+//  reverseCard = false;
+//  endmessage = '';
   //reset direction
-  reverseDirection = false;
-  if (topCard.includes('reverse')) {
-    reverseDirection = !reverseDirection;
-    reverseCard = true;
-  }
+//  reverseDirection = false;
+// if (topCard.includes('reverse')) {
+//    reverseDirection = !reverseDirection;
+//    reverseCard = true;
+//  }
   
- for (let thisPlayer = 0; thisPlayer < players.length; thisPlayer++) {
-	  playerdata[thisPlayer].blink = false;
-  }
+// for (let thisPlayer = 0; thisPlayer < players.length; thisPlayer++) {
+//	  playerdata[thisPlayer].blink = false;
+//  }
   
   
-  if (topCard.includes('flip')) {
-	  flip();
-  }
+//  if (topCard.includes('flip')) {
+//	  flip();
+//  }
   
   nextTurn(skip);
 
@@ -994,7 +995,7 @@ function nextPlayer(playerIndex, reverse = false) {
   }
 
 }
-
+//WHENA CARD LEAVES THE HAND
 //apply play card and rules
 function playCard(card, uuid, wildColour = null, socket) {
   //apply rules
@@ -1235,6 +1236,8 @@ function isPlayable(card) {
   let topCard = discard.slice(-1).pop() || ' ';
   let cardsets = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'picker', 'skip', 'reverse', 'flip'];
   let colours = ['yellow', 'blue', 'red', 'green', 'pink', 'purple', 'teal', 'orange'];
+  let sets = ['11','12','13','14','15','16','17','18','19','20','21'];
+  let letters = ['a','i','u','e','o','ka','ki','ku','ke','ko','sa','shi','tsu','te','to','na','ni','nu','ne','no','ha','hi','fu','he','ho','ma','mi','mu','me','mo','ya','yu','yo','ra','ri','ru','re','ro','wa','wo','n'];
   let valid = false;
   if (drawEnabled) {
     valid = valid || (topCard.includes('picker') && card.includes('picker'));
@@ -1256,6 +1259,8 @@ function isSlapdown(card) {
   let topCard = discard.slice(-1).pop() || ' ';
   let cardsets = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'picker', 'skip', 'reverse', 'flip'];
   let colours = ['yellow', 'blue', 'red', 'green', 'pink', 'purple', 'teal', 'orange'];
+  let sets = ['11','12','13','14','15','16','17','18','19','20','21'];
+  let letters = ['a','i','u','e','o','ka','ki','ku','ke','ko','sa','shi','tsu','te','to','na','ni','nu','ne','no','ha','hi','fu','he','ho','ma','mi','mu','me','mo','ya','yu','yo','ra','ri','ru','re','ro','wa','wo','n'];
   let slap = false;
   colours.forEach(colour => {
     cardsets.forEach(cardset => {
